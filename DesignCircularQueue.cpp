@@ -1,16 +1,32 @@
 /*
 LeetCode 622: Design Circular Queue
 
-Design your implementation of the circular queue. 
-Implement the MyCircularQueue class:
+Implement a fixed capacity circular queue supporting O(1) operations:
+    - MyCircularQueue(k): construct queue of capacity k
+    - enQueue(value): push value at the logical rear (fails if full)
+    - deQueue(): pop from logical front (fails if empty)
+    - Front()/Rear(): peek front / rear (return -1 if empty)
+    - isEmpty()/isFull(): state queries
 
-MyCircularQueue(k): Initializes the queue with the size k.
-enQueue(value): Inserts an element into the circular queue. Return true if the operation is successful.
-deQueue(): Deletes an element from the circular queue. Return true if the operation is successful.
-Front(): Gets the front item. If empty, return -1.
-Rear(): Gets the last item. If empty, return -1.
-isEmpty(): Checks whether the queue is empty.
-isFull(): Checks whether the queue is full.
+Core Idea (Ring Buffer):
+We reuse a fixed-size vector and wrap indices with modulo arithmetic so that
+no data needs to be physically shifted when elements are enqueued/dequeued.
+
+State Invariants:
+    - 0 <= count <= capacity
+    - When count > 0, head indexes the current front element
+    - When count > 0, tail indexes the current rear element
+    - tail advances (tail + 1) % capacity on successful enqueue
+    - head advances (head + 1) % capacity on successful dequeue
+    - We initialize tail = -1 so first enqueue sets tail = 0 cleanly
+
+Complexity:
+    Time: O(1) for all operations
+    Space: O(k)
+
+Possible Alternatives:
+    - Omit `tail` and compute as (head + count - 1) % capacity when needed.
+    - Use capacity+1 storage and detect full by (tail+1)%N == head (sentinel slot).
 */
 
 #include <vector>
@@ -18,48 +34,58 @@ using namespace std;
 
 class MyCircularQueue {
 private:
-    vector<int> q;   // internal array
-    int head, tail;  // indices
-    int count;       // current size
-    int capacity;    // max size
+    vector<int> q;    // underlying fixed-size storage for elements
+    int head;         // index of logical front element (valid if count > 0)
+    int tail;         // index of logical rear element (valid if count > 0)
+    int count;        // number of stored elements currently in queue
+    int capacity;     // maximum number of elements queue can hold
 
 public:
-    MyCircularQueue(int k) {
-        capacity = k;
-        q.resize(k);
-        head = 0;
-        tail = -1;
-        count = 0;
+    explicit MyCircularQueue(int k)
+        : q(k), head(0), tail(-1), count(0), capacity(k) {
+        // vector pre-sized to capacity; contents uninitialized logically
     }
     
     bool enQueue(int value) {
-        if (isFull()) return false;
-        tail = (tail + 1) % capacity; // circular increment
-        q[tail] = value;
-        count++;
-        return true;
+        if (isFull()) return false;          // cannot insert if already full
+        tail = (tail + 1) % capacity;        // wrap tail forward circularly
+        q[tail] = value;                     // store new element
+        if (count == 0) {
+            head = tail;                     // first element: head == tail
+        }
+        ++count;                             // update size
+        return true;                         // success
     }
     
     bool deQueue() {
-        if (isEmpty()) return false;
-        head = (head + 1) % capacity; // move head forward
-        count--;
-        return true;
+        if (isEmpty()) return false;         // nothing to remove
+        head = (head + 1) % capacity;        // logically discard front
+        --count;                             // decrease element count
+        if (count == 0) {                    // queue became empty
+            // Optional reset to initial state (not required for correctness)
+            head = 0;                        // keeps indices tidy
+            tail = -1;
+        }
+        return true;                         // success
     }
     
-    int Front() {
-        return isEmpty() ? -1 : q[head];
+    int Front() const {
+        return isEmpty() ? -1 : q[head];     // return element or sentinel
     }
     
-    int Rear() {
-        return isEmpty() ? -1 : q[tail];
+    int Rear() const {
+        return isEmpty() ? -1 : q[tail];     // return element or sentinel
     }
     
-    bool isEmpty() {
+    bool isEmpty() const {                   // true if no stored elements
         return count == 0;
     }
     
-    bool isFull() {
+    bool isFull() const {                    // true if size reached capacity
         return count == capacity;
+    }
+
+    int size() const {                       // helper: current number of elements
+        return count;
     }
 };
